@@ -403,6 +403,14 @@ const BallSortGame = () => {
             <Button variant="primary" size="sm" onClick={startNewGame} className="ml-2">
               New Game
             </Button>
+            <Button variant="secondary" size="sm" onClick={handleSolve} disabled={solving}>
+              {solving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Solving...
+                </>
+              ) : 'Solve Puzzle'}
+            </Button>
           </div>
         </CardTitle>
       </CardHeader>
@@ -450,22 +458,6 @@ const BallSortGame = () => {
                 <span className="text-sm text-gray-500">Tube {tubeIndex + 1}</span>
               </div>
             ))}
-          </div>
-
-          {/* Solve button */}
-          <div className="flex justify-center">
-            <Button 
-              onClick={handleSolve} 
-              disabled={solving}
-              className="w-32"
-            >
-              {solving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Solving...
-                </>
-              ) : 'Solve Puzzle'}
-            </Button>
           </div>
 
           {/* Completion Message */}
