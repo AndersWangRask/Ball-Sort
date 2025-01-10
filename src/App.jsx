@@ -18,17 +18,12 @@ const COLORS = {
 const initialPuzzleState = {
   maxBalls: 4,
   tubes: [
-  ['OR', 'LG', 'PU', 'GY'],     // Tube 1
-  ['PK', 'PK', 'PK', 'RD'],     // Tube 2
-  ['LG', 'PU', 'LG', 'LB'],     // Tube 3
-  ['GY', 'OR', 'LB', 'DB'],     // Tube 4
-  ['DB', 'PU', 'LB', 'GY'],     // Tube 5
-  ['PK', 'DG', 'LB', 'DB'],     // Tube 6
-  ['LG', 'PU', 'RD', 'OR'],     // Tube 7
-  ['DG', 'GY', 'DG', 'RD'],     // Tube 8
-  ['DG', 'OR', 'DB', 'RD'],     // Tube 9
-  [],                           // Tube 10
-  []                            // Tube 11
+    ['RD', 'PK', 'LG', 'PK'],
+    ['LG', 'RD', 'PK', 'LG'],
+    ['DB', 'DB', 'RD', 'RD'],
+    ['DB', 'PK', 'LG', 'DB'],
+    [],
+    []
   ]
 };
 
