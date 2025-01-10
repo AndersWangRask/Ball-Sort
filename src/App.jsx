@@ -269,16 +269,16 @@ const BallSortVisualizer = () => {
   };
 
   return (
-    <Card className="w-full max-w-4xl">
+    <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle>Ball Sort Puzzle Solver</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
           {/* Display current state */}
-          <div className="grid grid-cols-6 gap-4">
+          <div className="grid grid-cols-6 gap-4 justify-center">
             {initialPuzzleState.tubes.map((tube, tubeIndex) => (
-              <div key={tubeIndex} className="flex flex-col space-y-1 border rounded p-2">
+              <div key={tubeIndex} className="flex flex-col items-center space-y-1 border rounded p-2 w-16">
                 {/* Empty spaces at top */}
                 {Array(initialPuzzleState.maxBalls - tube.length).fill(null).map((_, i) => (
                   <div key={`empty-${i}`} className="w-8 h-8 border rounded-full" />
@@ -291,6 +291,8 @@ const BallSortVisualizer = () => {
                     style={{ backgroundColor: COLORS[ball].hex }}
                   />
                 ))}
+                {/* Tube number */}
+                <div className="text-sm mt-2">{tubeIndex + 1}</div>
               </div>
             ))}
           </div>
