@@ -239,17 +239,116 @@ function solvePuzzleBFS(initialTubes, maxBalls, maxMoves = 25000000, timeLimit =
   };
 }
 
-const BallSortVisualizer = () => {
+const BallSortGame = () => {
+  // Game state
+  const [tubes, setTubes] = useState(initialPuzzleState.tubes);
+  const [moveCount, setMoveCount] = useState(0);
+  const [moveHistory, setMoveHistory] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
   const [solving, setSolving] = useState(false);
   const [solution, setSolution] = useState(null);
   const [validation, setValidation] = useState(null);
+  const [dragState, setDragState] = useState({
+    dragging: false,
+    sourceIndex: null,
+    invalidMove: false
+  });
 
+  const tubeRefs = useRef([]);
+
+  // Game logic functions
+  const isValidMove = (fromTube, toTube) => {
+    if (fromTube === toTube) return false;
+    if (tubes[fromTube].length === 0) return false;
+    if (tubes[toTube].length >= initialPuzzleState.maxBalls) return false;
+    
+    const ballToMove = tubes[fromTube][0];
+    return tubes[toTube].length === 0 || tubes[toTube][0] === ballToMove;
+  };
+
+  const makeMove = (fromTube, toTube) => {
+    if (!isValidMove(fromTube, toTube)) {
+      setDragState(prev => ({ ...prev, invalidMove: true }));
+      setTimeout(() => setDragState(prev => ({ ...prev, invalidMove: false })), 500);
+      return false;
+    }
+
+    const newTubes = [...tubes];
+    const ball = newTubes[fromTube][0];
+    newTubes[fromTube] = newTubes[fromTube].slice(1);
+    newTubes[toTube] = [ball, ...newTubes[toTube]];
+    
+    setTubes(newTubes);
+    setMoveCount(prev => prev + 1);
+    setMoveHistory(prev => [...prev, { from: fromTube, to: toTube, ball }]);
+    setRedoStack([]);
+    
+    return true;
+  };
+
+  const undo = () => {
+    if (moveHistory.length === 0) return;
+    
+    const lastMove = moveHistory[moveHistory.length - 1];
+    const newTubes = [...tubes];
+    const ball = newTubes[lastMove.to][0];
+    newTubes[lastMove.to] = newTubes[lastMove.to].slice(1);
+    newTubes[lastMove.from] = [ball, ...newTubes[lastMove.from]];
+    
+    setTubes(newTubes);
+    setMoveCount(prev => prev - 1);
+    setMoveHistory(prev => prev.slice(0, -1));
+    setRedoStack(prev => [...prev, lastMove]);
+  };
+
+  const redo = () => {
+    if (redoStack.length === 0) return;
+    const move = redoStack[redoStack.length - 1];
+    makeMove(move.from, move.to);
+    setRedoStack(prev => prev.slice(0, -1));
+  };
+
+  // Drag and drop handlers
+  const handleDragStart = (e, tubeIndex) => {
+    if (tubes[tubeIndex].length === 0) {
+      e.preventDefault();
+      return;
+    }
+    setDragState({
+      dragging: true,
+      sourceIndex: tubeIndex,
+      invalidMove: false
+    });
+  };
+
+  const handleDragOver = (e, tubeIndex) => {
+    e.preventDefault();
+    if (dragState.sourceIndex !== null && isValidMove(dragState.sourceIndex, tubeIndex)) {
+      e.dataTransfer.dropEffect = 'move';
+    } else {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  };
+
+  const handleDrop = (e, tubeIndex) => {
+    e.preventDefault();
+    if (dragState.sourceIndex !== null) {
+      makeMove(dragState.sourceIndex, tubeIndex);
+    }
+    setDragState({ dragging: false, sourceIndex: null, invalidMove: false });
+  };
+
+  const handleDragEnd = () => {
+    setDragState({ dragging: false, sourceIndex: null, invalidMove: false });
+  };
+
+  // Solver integration
   const handleSolve = async () => {
     setSolving(true);
     setSolution(null);
     
     // Validate first
-    const validationResult = validatePuzzle(initialPuzzleState.tubes, initialPuzzleState.maxBalls);
+    const validationResult = validatePuzzle(tubes, initialPuzzleState.maxBalls);
     setValidation(validationResult);
     
     if (!validationResult.valid) {
@@ -257,10 +356,9 @@ const BallSortVisualizer = () => {
       return;
     }
 
-    // Use setTimeout to allow UI to update before heavy computation
     setTimeout(() => {
       const result = solvePuzzleBFS(
-        initialPuzzleState.tubes.map(t => [...t]), 
+        tubes.map(t => [...t]), 
         initialPuzzleState.maxBalls
       );
       setSolution(result);
@@ -271,28 +369,61 @@ const BallSortVisualizer = () => {
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Ball Sort Puzzle Solver</CardTitle>
+        <CardTitle className="flex justify-between items-center">
+          <span>Ball Sort Puzzle</span>
+          <div className="flex items-center space-x-4">
+            <span className="text-sm font-normal">Moves: {moveCount}</span>
+            <Button variant="outline" size="sm" onClick={undo} disabled={moveHistory.length === 0}>
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={redo} disabled={redoStack.length === 0}>
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
-          {/* Display current state */}
+          {/* Game grid */}
           <div className="grid grid-cols-6 gap-4 justify-center">
-            {initialPuzzleState.tubes.map((tube, tubeIndex) => (
-              <div key={tubeIndex} className="flex flex-col items-center space-y-1 border rounded p-2 w-16">
-                {/* Empty spaces at top */}
-                {Array(initialPuzzleState.maxBalls - tube.length).fill(null).map((_, i) => (
-                  <div key={`empty-${i}`} className="w-8 h-8 border rounded-full" />
-                ))}
-                {/* Balls from top to bottom */}
-                {tube.map((ball, ballIndex) => (
-                  <div
-                    key={ballIndex}
-                    className="w-8 h-8 rounded-full"
-                    style={{ backgroundColor: COLORS[ball].hex }}
-                  />
-                ))}
-                {/* Tube number */}
-                <div className="text-sm mt-2">{tubeIndex + 1}</div>
+            {tubes.map((tube, tubeIndex) => (
+              <div 
+                key={tubeIndex} 
+                className="flex flex-col items-center"
+                ref={el => tubeRefs.current[tubeIndex] = el}
+              >
+                <div 
+                  className={`flex flex-col space-y-1 border rounded p-2 ${
+                    dragState.dragging && isValidMove(dragState.sourceIndex, tubeIndex) 
+                      ? 'border-green-500' 
+                      : ''
+                  } ${
+                    dragState.invalidMove && dragState.sourceIndex === tubeIndex 
+                      ? 'shake' 
+                      : ''
+                  }`}
+                  onDragOver={(e) => handleDragOver(e, tubeIndex)}
+                  onDrop={(e) => handleDrop(e, tubeIndex)}
+                >
+                  {Array(initialPuzzleState.maxBalls - tube.length)
+                    .fill(null)
+                    .map((_, i) => (
+                      <div key={`empty-${i}`} className="w-8 h-8 border rounded-full" />
+                    ))}
+                  {tube.map((ball, ballIndex) => (
+                    <div
+                      key={ballIndex}
+                      className={`w-8 h-8 rounded-full ${
+                        ballIndex === 0 ? 'cursor-grab active:cursor-grabbing' : ''
+                      }`}
+                      style={{ backgroundColor: COLORS[ball].hex }}
+                      draggable={ballIndex === 0}
+                      onDragStart={(e) => handleDragStart(e, tubeIndex)}
+                      onDragEnd={handleDragEnd}
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-gray-500">Tube {tubeIndex + 1}</span>
               </div>
             ))}
           </div>
@@ -377,8 +508,19 @@ const BallSortVisualizer = () => {
           )}
         </div>
       </CardContent>
+
+      <style jsx global>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-4px); }
+          75% { transform: translateX(4px); }
+        }
+        .shake {
+          animation: shake 0.2s ease-in-out 0s 2;
+        }
+      `}</style>
     </Card>
   );
 };
 
-export default BallSortVisualizer;
+export default BallSortGame;
