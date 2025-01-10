@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AlertCircle, CheckCircle2, Loader2, Undo2, Redo2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Undo2, Redo2, ChevronDown } from 'lucide-react';
 import Confetti from 'react-confetti'; // Import Confetti
 
 const COLORS = {
@@ -85,25 +85,27 @@ function isEmptyTubeMoveNecessary(tubes, fromTubeIdx, ball, maxBalls) {
   );
 }
 
+// 2.3. Modify the getNextStates function to allow more mixing by relaxing the isUsefulMove condition
 function getNextStates(tubes, maxBalls) {
   const nextStates = [];
 
   for (let i = 0; i < tubes.length; i++) {
     const fromTube = tubes[i];
     if (fromTube.length === 0 || isTubeSorted(fromTube, maxBalls)) continue;
-    
+
     const topBall = fromTube[0];
 
     for (let j = 0; j < tubes.length; j++) {
       if (i === j) continue;
       const toTube = tubes[j];
 
-      if (toTube.length >= maxBalls || isTubeSorted(toTube, maxBalls)) continue;
+      if (toTube.length >= maxBalls) continue;
 
       const isValidMove = toTube.length === 0 || toTube[0] === topBall;
-      const isUsefulMove = toTube.length > 0 || isEmptyTubeMoveNecessary(tubes, i, topBall, maxBalls);
+      // Removed the isUsefulMove condition to allow more diverse moves
+      // const isUsefulMove = toTube.length > 0 || isEmptyTubeMoveNecessary(tubes, i, topBall, maxBalls);
 
-      if (isValidMove && isUsefulMove) {
+      if (isValidMove /* && isUsefulMove */) {
         const newTubes = tubes.map(t => [...t]);
         newTubes[i] = [...fromTube.slice(1)];
         newTubes[j] = [topBall, ...toTube];
@@ -235,9 +237,20 @@ function solvePuzzleBFS(initialTubes, maxBalls, maxMoves = 25000000, timeLimit =
   };
 }
 
+// 2.4. Increase shuffleMoves for better shuffling
+const DIFFICULTIES = {
+  Easy:    { numTubes: 6,  emptyTubes: 2, maxBalls: 4, shuffleMoves: 100 },
+  Medium:  { numTubes: 8,  emptyTubes: 2, maxBalls: 4, shuffleMoves: 200 },
+  Hard:    { numTubes: 10, emptyTubes: 2, maxBalls: 4, shuffleMoves: 400 },
+  Extreme: { numTubes: 12, emptyTubes: 2, maxBalls: 4, shuffleMoves: 1000 },
+};
+
 const BallSortGame = () => {
   // Game state
-  const [tubes, setTubes] = useState(initialPuzzleState.tubes);
+  const [puzzle, setPuzzle] = useState({
+    maxBalls: initialPuzzleState.maxBalls,
+    tubes: initialPuzzleState.tubes
+  });
   const [moveCount, setMoveCount] = useState(0);
   const [moveHistory, setMoveHistory] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
@@ -250,17 +263,20 @@ const BallSortGame = () => {
     invalidMove: false
   });
   const [isComplete, setIsComplete] = useState(false); // Add isComplete state
+  const [difficulty, setDifficulty] = useState('Easy'); // Add difficulty state
+  const [initialTubes, setInitialTubes] = useState(initialPuzzleState.tubes); // Track initial puzzle for reset
+  const [dropdownOpen, setDropdownOpen] = useState(false); // Manage dropdown state
 
   const tubeRefs = useRef([]);
 
   // Game logic functions
   const isValidMove = (fromTube, toTube) => {
     if (fromTube === toTube) return false;
-    if (tubes[fromTube].length === 0) return false;
-    if (tubes[toTube].length >= initialPuzzleState.maxBalls) return false;
+    if (puzzle.tubes[fromTube].length === 0) return false;
+    if (puzzle.tubes[toTube].length >= puzzle.maxBalls) return false;
     
-    const ballToMove = tubes[fromTube][0];
-    return tubes[toTube].length === 0 || tubes[toTube][0] === ballToMove;
+    const ballToMove = puzzle.tubes[fromTube][0];
+    return puzzle.tubes[toTube].length === 0 || puzzle.tubes[toTube][0] === ballToMove;
   };
 
   const makeMove = (fromTube, toTube) => {
@@ -270,17 +286,17 @@ const BallSortGame = () => {
       return false;
     }
 
-    const newTubes = [...tubes];
+    const newTubes = [...puzzle.tubes];
     const ball = newTubes[fromTube][0];
     newTubes[fromTube] = newTubes[fromTube].slice(1);
     newTubes[toTube] = [ball, ...newTubes[toTube]];
     
-    setTubes(newTubes);
+    setPuzzle({ ...puzzle, tubes: newTubes });
     setMoveCount(prev => prev + 1);
     setMoveHistory(prev => [...prev, { from: fromTube, to: toTube, ball }]);
     setRedoStack([]);
     
-    if (isSolved(newTubes, initialPuzzleState.maxBalls)) { // Check if solved
+    if (isSolved(newTubes, puzzle.maxBalls)) { // Check if solved
       setIsComplete(true); // Set isComplete to true
     } else {
       setIsComplete(false); // Ensure isComplete is false if not solved
@@ -293,18 +309,18 @@ const BallSortGame = () => {
     if (moveHistory.length === 0) return;
     
     const lastMove = moveHistory[moveHistory.length - 1];
-    const newTubes = [...tubes];
+    const newTubes = [...puzzle.tubes];
     const ball = newTubes[lastMove.to][0];
     newTubes[lastMove.to] = newTubes[lastMove.to].slice(1);
     newTubes[lastMove.from] = [ball, ...newTubes[lastMove.from]];
     
-    setTubes(newTubes);
+    setPuzzle({ ...puzzle, tubes: newTubes });
     setMoveCount(prev => prev - 1);
     setMoveHistory(prev => prev.slice(0, -1));
     setRedoStack(prev => [...prev, lastMove]);
 
     // Update isComplete based on the new state
-    if (isSolved(newTubes, initialPuzzleState.maxBalls)) {
+    if (isSolved(newTubes, puzzle.maxBalls)) {
       setIsComplete(true);
     } else {
       setIsComplete(false);
@@ -318,9 +334,82 @@ const BallSortGame = () => {
     setRedoStack(prev => prev.slice(0, -1));
   };
 
-  // 1. Add the startNewGame function
+  // 2.1. Add a shuffle function to randomize arrays
+const shuffleArray = (array) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
+// 2.7. Update generateRandomPuzzle to ensure puzzle solvability
+const generateRandomPuzzle = (selectedDifficulty) => {
+  const { numTubes, emptyTubes, maxBalls } = DIFFICULTIES[selectedDifficulty];
+  const maxAttempts = 10;
+  let attempt = 0;
+
+  while (attempt < maxAttempts) {
+    attempt++;
+
+    // Determine how many distinct colors are needed
+    const colorsNeeded = numTubes - emptyTubes;
+    const allColors = Object.keys(COLORS);
+    const usedColors = allColors.slice(0, colorsNeeded);
+
+    // Create all balls
+    let ballPool = [];
+    usedColors.forEach((color) => {
+      for (let i = 0; i < maxBalls; i++) {
+        ballPool.push(color);
+      }
+    });
+
+    // Randomize pool
+    ballPool = shuffleArray(ballPool);
+
+    // Build tubes
+    const newTubes = [];
+    for (let i = 0; i < colorsNeeded; i++) {
+      const start = i * maxBalls;
+      newTubes.push(ballPool.slice(start, start + maxBalls));
+    }
+    for (let i = 0; i < emptyTubes; i++) {
+      newTubes.push([]);
+    }
+
+    // Validate + BFS to ensure solvable
+    const validation = validatePuzzle(newTubes, maxBalls);
+    if (!validation.valid) continue;
+
+    const result = solvePuzzleBFS(newTubes, maxBalls, 300000, 20000);
+    if (result.solvable) {
+      return { maxBalls, tubes: newTubes };
+    }
+  }
+
+  // Fallback
+  return { maxBalls: initialPuzzleState.maxBalls, tubes: initialPuzzleState.tubes };
+};
+
+  // 4. Add resetPuzzle function
+  const resetPuzzle = () => {
+    setPuzzle({
+      maxBalls: initialPuzzleState.maxBalls,
+      tubes: initialPuzzleState.tubes
+    });
+    setMoveCount(0);
+    setMoveHistory([]);
+    setRedoStack([]);
+    setIsComplete(false);
+    setValidation(null);
+    setSolution(null);
+  };
+
+  // 5. Modify startNewGame to generate a new puzzle based on selected difficulty
   const startNewGame = () => {
-    setTubes(initialPuzzleState.tubes);
+    const newPuzzle = generateRandomPuzzle(difficulty);
+    setPuzzle(newPuzzle);
     setMoveCount(0);
     setMoveHistory([]);
     setRedoStack([]);
@@ -331,7 +420,7 @@ const BallSortGame = () => {
 
   // Drag and drop handlers
   const handleDragStart = (e, tubeIndex) => {
-    if (tubes[tubeIndex].length === 0) {
+    if (puzzle.tubes[tubeIndex].length === 0) {
       e.preventDefault();
       return;
     }
@@ -369,7 +458,7 @@ const BallSortGame = () => {
     setSolution(null);
     
     // Validate first
-    const validationResult = validatePuzzle(tubes, initialPuzzleState.maxBalls);
+    const validationResult = validatePuzzle(puzzle.tubes, puzzle.maxBalls);
     setValidation(validationResult);
     
     if (!validationResult.valid) {
@@ -379,14 +468,15 @@ const BallSortGame = () => {
 
     setTimeout(() => {
       const result = solvePuzzleBFS(
-        tubes.map(t => [...t]), 
-        initialPuzzleState.maxBalls
+        puzzle.tubes.map(t => [...t]), 
+        puzzle.maxBalls
       );
       setSolution(result);
       setSolving(false);
     }, 100);
   };
 
+  // 3. Add difficulty selection dropdown and indicate current difficulty
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
@@ -411,14 +501,53 @@ const BallSortGame = () => {
                 </>
               ) : 'Solve Puzzle'}
             </Button>
+            {/* 3.1. Add Difficulty Dropdown */}
+            <div className="relative inline-block text-left">
+              <div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-2 flex items-center"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                >
+                  {difficulty} <ChevronDown className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+
+              {dropdownOpen && (
+                <div className="origin-top-right absolute right-0 mt-2 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
+                  <div className="py-1">
+                    {Object.keys(DIFFICULTIES).map((level) => (
+                      <button
+                        key={level}
+                        onClick={() => {
+                          setDifficulty(level);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        {level}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {/* 4. Add Reset Button */}
+          <div className="flex justify-center">
+            <Button variant="outline" size="sm" onClick={resetPuzzle} disabled={moveHistory.length === 0 && redoStack.length === 0}>
+              Reset
+            </Button>
+          </div>
+
           {/* Game grid */}
           <div className="grid grid-cols-6 gap-4 justify-center">
-            {tubes.map((tube, tubeIndex) => (
+            {puzzle.tubes.map((tube, tubeIndex) => (
               <div 
                 key={tubeIndex} 
                 className="flex flex-col items-center"
@@ -437,7 +566,7 @@ const BallSortGame = () => {
                   onDragOver={(e) => handleDragOver(e, tubeIndex)}
                   onDrop={(e) => handleDrop(e, tubeIndex)}
                 >
-                  {Array(initialPuzzleState.maxBalls - tube.length)
+                  {Array(puzzle.maxBalls - tube.length)
                     .fill(null)
                     .map((_, i) => (
                       <div key={`empty-${i}`} className="w-8 h-8 border rounded-full" />
@@ -530,6 +659,11 @@ const BallSortGame = () => {
               )}
             </div>
           )}
+
+          {/* Indicate Current Difficulty */}
+          <div className="flex justify-center">
+            <span className="text-sm font-medium">Difficulty: {difficulty}</span>
+          </div>
         </div>
       </CardContent>
 
