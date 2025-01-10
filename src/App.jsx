@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from './components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle2, Loader2, Undo2, Redo2 } from 'lucide-react';
+import Confetti from 'react-confetti'; // Import Confetti
 
 const COLORS = {
   LB: { name: 'LIGHT_BLUE',  hex: '#87CEEB' },
@@ -248,6 +249,7 @@ const BallSortGame = () => {
     sourceIndex: null,
     invalidMove: false
   });
+  const [isComplete, setIsComplete] = useState(false); // Add isComplete state
 
   const tubeRefs = useRef([]);
 
@@ -278,6 +280,12 @@ const BallSortGame = () => {
     setMoveHistory(prev => [...prev, { from: fromTube, to: toTube, ball }]);
     setRedoStack([]);
     
+    if (isSolved(newTubes, initialPuzzleState.maxBalls)) { // Check if solved
+      setIsComplete(true); // Set isComplete to true
+    } else {
+      setIsComplete(false); // Ensure isComplete is false if not solved
+    }
+
     return true;
   };
 
@@ -294,6 +302,13 @@ const BallSortGame = () => {
     setMoveCount(prev => prev - 1);
     setMoveHistory(prev => prev.slice(0, -1));
     setRedoStack(prev => [...prev, lastMove]);
+
+    // Update isComplete based on the new state
+    if (isSolved(newTubes, initialPuzzleState.maxBalls)) {
+      setIsComplete(true);
+    } else {
+      setIsComplete(false);
+    }
   };
 
   const redo = () => {
@@ -301,6 +316,17 @@ const BallSortGame = () => {
     const move = redoStack[redoStack.length - 1];
     makeMove(move.from, move.to);
     setRedoStack(prev => prev.slice(0, -1));
+  };
+
+  // 1. Add the startNewGame function
+  const startNewGame = () => {
+    setTubes(initialPuzzleState.tubes);
+    setMoveCount(0);
+    setMoveHistory([]);
+    setRedoStack([]);
+    setIsComplete(false);
+    setValidation(null);
+    setSolution(null);
   };
 
   // Drag and drop handlers
@@ -374,6 +400,9 @@ const BallSortGame = () => {
             <Button variant="outline" size="sm" onClick={redo} disabled={redoStack.length === 0}>
               <Redo2 className="h-4 w-4" />
             </Button>
+            <Button variant="primary" size="sm" onClick={startNewGame} className="ml-2">
+              New Game
+            </Button>
           </div>
         </CardTitle>
       </CardHeader>
@@ -438,6 +467,14 @@ const BallSortGame = () => {
               ) : 'Solve Puzzle'}
             </Button>
           </div>
+
+          {/* Completion Message */}
+          {isComplete && (
+            <div className="flex flex-col items-center mt-4">
+              <p className="text-2xl">🎉 Congratulations! You've solved the puzzle! 🎉</p>
+              <Confetti />
+            </div>
+          )}
 
           {/* Validation Results */}
           {validation && !validation.valid && (
